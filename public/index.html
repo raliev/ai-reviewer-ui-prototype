@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manuscript Validation Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .ql-editor { min-height: 500px; font-size: 1.05rem; line-height: 1.6; }
+        .breadcrumb-item:not(:last-child)::after { content: "/"; margin: 0 10px; color: #9ca3af; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans">
+
+<div id="app" class="min-h-screen flex flex-col">
+    <!-- Main Header -->
+    <nav class="bg-white border-b border-gray-200 px-8 py-3 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-6">
+            <h1 class="text-xl font-black tracking-tighter text-indigo-600 flex items-center gap-2">
+                <i data-lucide="shield-check" class="w-6 h-6"></i> VALIDATE.io
+            </h1>
+        </div>
+        <div class="flex gap-4 items-center">
+            <div class="text-right mr-2 hidden sm:block">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Research Account</p>
+                <p class="text-sm font-medium">Dr. Rauf Aliev</p>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-sm">RA</div>
+        </div>
+    </nav>
+
+    <main class="flex-grow p-6 sm:p-10 max-w-6xl mx-auto w-full">
+        <div id="view-container"></div>
+    </main>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script>
+    // --- State Management ---
+    let projects = JSON.parse(localStorage.getItem('v_projects')) || [];
+
+    const saveProjects = () => localStorage.setItem('v_projects', JSON.stringify(projects));
+
+    // --- View Controller ---
+    function render() {
+        const container = document.getElementById('view-container');
+        if (projects.length === 0) {
+            renderUploadForm(container);
+        } else {
+            renderDashboard(container);
+        }
+        lucide.createIcons();
+    }
+
+    // --- Navigation / Breadcrumbs ---
+    function renderBreadcrumbs(currentTitle = null) {
+        let html = `
+                <nav class="flex text-sm font-medium text-gray-500 mb-6 items-center">
+                    <a href="#" onclick="render(); return false;" class="hover:text-indigo-600 transition flex items-center gap-1">
+                        <i data-lucide="home" class="w-4 h-4"></i> Validation
+                    </a>
+                    <span class="mx-3 text-gray-300">/</span>
+                    <a href="#" onclick="render(); return false;" class="hover:text-indigo-600 transition">Projects</a>
+            `;
+        if (currentTitle) {
+            html += `
+                    <span class="mx-3 text-gray-300">/</span>
+                    <span class="text-gray-900 font-bold truncate max-w-[200px]">${currentTitle}</span>
+                `;
+        }
+        html += `</nav>`;
+        return html;
+    }
+
+    // --- UI Screens ---
+
+    function renderDashboard(container) {
+        container.innerHTML = `
+                ${renderBreadcrumbs()}
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-gray-900 tracking-tight">Manuscript Library</h2>
+                        <p class="text-gray-500">Track your submission audits and validation status.</p>
+                    </div>
+                    <button onclick="renderUploadForm(document.getElementById('view-container'))" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-100">
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i> New Manuscript
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-50/50 border-b border-gray-200">
+                            <tr>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">Created</th>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">Manuscript Title</th>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">Audit Status</th>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${projects.map(p => `
+                                <tr class="group hover:bg-indigo-50/30 transition">
+                                    <td class="px-6 py-5 text-sm text-gray-500">${p.date}</td>
+                                    <td class="px-6 py-5">
+                                        <div class="font-bold text-gray-900">${p.title}</div>
+                                        <div class="text-xs text-gray-400 font-mono">${p.id}</div>
+                                    </td>
+                                    <td class="px-6 py-5">
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold
+                                            ${p.status === 'Completed' ? 'bg-green-100 text-green-700' :
+            p.status === 'Checking' ? 'bg-amber-100 text-amber-700 animate-pulse' :
+                p.status === 'Check Results' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}">
+                                            <span class="w-1.5 h-1.5 rounded-full ${p.status === 'Checking' ? 'bg-amber-500' : (p.status === 'Completed' ? 'bg-green-500' : 'bg-blue-500')}"></span>
+                                            ${p.status}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-5 text-right">
+                                        <div class="flex justify-end gap-2">
+                                            ${renderActionButtons(p)}
+                                            <button onclick="deleteProject('${p.id}')" class="p-2 text-gray-300 hover:text-red-600 transition opacity-0 group-hover:opacity-100">
+                                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).reverse().join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+    }
+
+    function renderActionButtons(p) {
+        if (p.status === 'Completed') return `<button class="text-sm font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"><i data-lucide="download" class="w-4 h-4"></i> PDF</button>`;
+        if (p.status === 'New') return `<button class="text-sm font-bold text-indigo-600 hover:underline">Upload Files</button>`;
+        if (p.status === 'Checking') return `<button disabled class="text-sm font-bold text-gray-400 italic">Processing...</button>`;
+        if (p.status === 'Check Results') return `<button onclick="openEditor('${p.id}')" class="bg-indigo-600 text-white px-5 py-1.5 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md">Edit Results</button>`;
+        return '';
+    }
+
+    function renderUploadForm(container) {
+        container.innerHTML = `
+                ${projects.length > 0 ? renderBreadcrumbs('New Submission') : ''}
+                <div class="max-w-2xl mx-auto bg-white p-10 rounded-3xl shadow-xl border border-gray-100 mt-4">
+                    <div class="mb-8">
+                        <h2 class="text-2xl font-black text-gray-900">Validate Manuscript</h2>
+                        <p class="text-gray-500">Submit your work for automated ACM TORS compliance audit.</p>
+                    </div>
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-xs font-black uppercase text-gray-400 mb-2">Manuscript Title</label>
+                            <input type="text" id="m-title" placeholder="e.g. The Effect of Random Seeds for Data Splitting..." class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:border-indigo-500 outline-none transition font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black uppercase text-gray-400 mb-2">GitHub Repository (Optional)</label>
+                            <div class="relative">
+                                <i data-lucide="github" class="absolute left-4 top-3.5 w-5 h-5 text-gray-400"></i>
+                                <input type="url" id="m-github" placeholder="https://github.com/..." class="w-full border-2 border-gray-100 rounded-xl pl-12 pr-4 py-3 focus:border-indigo-500 outline-none transition font-medium">
+                            </div>
+                        </div>
+                        <div class="border-2 border-dashed border-gray-200 rounded-2xl p-10 text-center hover:border-indigo-400 hover:bg-indigo-50/30 transition cursor-pointer group">
+                            <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-white transition">
+                                <i data-lucide="upload" class="w-8 h-8 text-gray-400 group-hover:text-indigo-600"></i>
+                            </div>
+                            <p class="font-bold text-gray-700">Drop manuscript file here</p>
+                            <p class="text-xs text-gray-400 mt-1">PDF or DOCX allowed (Max 25MB)</p>
+                        </div>
+                        <button onclick="handleUpload()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 flex items-center justify-center gap-3">
+                            <i data-lucide="zap" class="w-5 h-5"></i> Start Audit
+                        </button>
+                    </div>
+                </div>
+            `;
+        lucide.createIcons();
+    }
+
+    function openEditor(projectId) {
+        const p = projects.find(proj => proj.id === projectId);
+        const container = document.getElementById('view-container');
+        container.innerHTML = `
+                ${renderBreadcrumbs(p.title)}
+                <div class="flex flex-col h-[85vh]">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-gray-900">${p.title}</h2>
+                            <p class="text-sm text-gray-500 flex items-center gap-2">
+                                <i data-lucide="check-circle" class="w-4 h-4 text-green-500"></i> Automated Audit Complete
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition flex items-center gap-2">
+                                <i data-lucide="file-text" class="w-4 h-4"></i> Word
+                            </button>
+                            <button class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition flex items-center gap-2">
+                                <i data-lucide="code" class="w-4 h-4"></i> LaTeX
+                            </button>
+                            <button onclick="finalizeSubmission('${p.id}')" id="btn-submit" class="bg-green-600 text-white px-6 py-2 rounded-xl font-black text-sm uppercase tracking-widest hover:bg-green-700 transition shadow-lg shadow-green-100">
+                                Finalize Submission
+                            </button>
+                        </div>
+                    </div>
+                    <div id="editor-wrapper" class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex-grow flex flex-col">
+                        <div id="editor" class="flex-grow"></div>
+                    </div>
+                    <div id="pdf-link-container" class="mt-4"></div>
+                </div>
+            `;
+
+        var quill = new Quill('#editor', { theme: 'snow' });
+
+        // Content derived from uploaded DOCX, focused on deficiencies
+        quill.clipboard.dangerouslyPasteHTML(`
+                <h1 style="color: #111827; font-weight: 900;">ACM TORS Submission Audit: Deficiencies Report</h1>
+                <p><strong>Manuscript:</strong> ${p.title}</p>
+                <hr/>
+                <h3 style="margin-top: 20px; color: #b91c1c;">1. CRITICAL DEFICIENCIES (Requires Manual Correction)</h3>
+                <p style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; border-radius: 8px;">
+                    <strong>[ISSUE: RUNTIME DOCUMENTATION]</strong><br/>
+                    While Slurm configuration files provide time limits for individual stages, a <strong>total estimated runtime</strong> for the full experiment is missing from the main text.
+                    <br/><br/>
+                    <em>Recommendation: Add a summary table in the "Method" section quantifying the total CPU/GPU hours required.</em>
+                </p>
+                <p style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                    <strong>[ISSUE: REPRODUCIBILITY - HARDWARE GAP]</strong><br/>
+                    The README warns that local execution takes "extremely long," but does not provide a reduced <strong>"toy" or "mini" version</strong> of the experiment for reviewers with limited hardware resources.
+                    <br/><br/>
+                    <em>Recommendation: Provide an <code>experiment_mini.json</code> file in the repository (1 dataset, 2 seeds).</em>
+                </p>
+
+                <h3 style="margin-top: 25px; color: #4338ca;">2. IMPROVEMENT ROADMAP</h3>
+                <ul>
+                    <li><strong>Dataset Metadata Correlation:</strong> Perform correlation analysis (Pearson/Spearman) between sparsity/size and the observed variance.</li>
+                    <li><strong>Hardware Context:</strong> Move details about the OMNI cluster from 'Acknowledgements' to 'Testing Environment' in Section 3.</li>
+                    <li><strong>Addressing HPO Sensitivity:</strong> Bolster the claim that HPO is a "confounding" factor with a small sensitivity set.</li>
+                </ul>
+                <p><em>Autosave: Last saved ${new Date().toLocaleTimeString()}</em></p>
+            `);
+
+        lucide.createIcons();
+    }
+
+    // --- Logic Handlers ---
+
+    function handleUpload() {
+        const titleInput = document.getElementById('m-title');
+        const title = titleInput.value.trim() || "Untitled Manuscript";
+        const id = "MSR-" + Math.floor(Math.random() * 1000000);
+
+        const newProj = {
+            id,
+            title,
+            date: new Date().toLocaleDateString(),
+            status: 'Checking',
+            content: ''
+        };
+
+        projects.push(newProj);
+        saveProjects();
+        render();
+
+        // Processing reduced to 1 second as requested
+        setTimeout(() => {
+            const p = projects.find(proj => proj.id === id);
+            if (p) {
+                p.status = 'Check Results';
+                saveProjects();
+                render();
+            }
+        }, 1000);
+    }
+
+    function deleteProject(id) {
+        projects = projects.filter(p => p.id !== id);
+        saveProjects();
+        render();
+    }
+
+    function finalizeSubmission(id) {
+        const p = projects.find(proj => proj.id === id);
+        const btn = document.getElementById('btn-submit');
+
+        btn.disabled = true;
+        btn.innerHTML = `<span class="flex items-center gap-2"><i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Generating PDF...</span>`;
+        lucide.createIcons();
+
+        setTimeout(() => {
+            p.status = 'Completed';
+            saveProjects();
+            const container = document.getElementById('pdf-link-container');
+            container.innerHTML = `
+                    <div class="bg-indigo-600 p-5 rounded-2xl flex items-center justify-between text-white shadow-xl shadow-indigo-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="file-check" class="w-6 h-6"></i>
+                            <div>
+                                <p class="font-black text-sm uppercase tracking-widest">Success</p>
+                                <p class="text-indigo-100 text-sm">Validated Manuscript PDF is ready for submission.</p>
+                            </div>
+                        </div>
+                        <a href="#" class="bg-white text-indigo-600 px-6 py-2 rounded-xl font-black text-sm uppercase tracking-widest hover:bg-indigo-50 transition shadow-sm">
+                            Download PDF
+                        </a>
+                    </div>
+                `;
+            btn.innerText = "Audit Finalized";
+            lucide.createIcons();
+        }, 1200);
+    }
+
+    // Initialize
+    render();
+</script>
+</body>
+</html>
